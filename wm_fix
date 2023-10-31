@@ -1,0 +1,48 @@
+import requests
+
+# Extract Unshipped Orders from Walmart
+WALMART_API_ENDPOINT = "https://marketplace.walmartapis.com/v3/orders?status=created&createdStartDate=yyyy-mm-ddThh:mm:ssZ"
+WALMART_API_KEY = "YOUR_API_KEY"
+
+def get_unshipped_orders_walmart():
+    headers = {
+        "Authorization": f"Bearer {WALMART_API_KEY}"
+    }
+    response = requests.get(WALMART_API_ENDPOINT, headers=headers)
+    if response.status_code == 200:
+        return response.json()['orders']
+    else:
+        print("Error fetching orders from Walmart")
+        return []
+
+unshipped_orders = get_unshipped_orders_walmart()
+
+# Verify Tracking Information in Shipworks
+SHIPWORKS_API_ENDPOINT = "https://api.shipworks.com/orders"
+SHIPWORKS_API_KEY = "YOUR_SHIPWORKS_API_KEY"
+
+def get_shipworks_tracking_info(walmart_order_number):
+    headers = {
+        "Authorization": f"Bearer {SHIPWORKS_API_KEY}"
+    }
+    response = requests.get(f"{SHIPWORKS_API_ENDPOINT}?walmartOrderNumber={walmart_order_number}", headers=headers)
+    if response.status_code == 200:
+        return response.json().get('trackingNumber')
+    else:
+        print("Error fetching tracking info from Shipworks")
+        return None
+
+shipworks_tracking = {order['orderId']: get_shipworks_tracking_info(order['orderId']) for order in unshipped_orders}
+
+# Cross-Referencing and List Generation
+def generate_mismatch_list():
+    mismatched_orders = []
+    for order in unshipped_orders:
+        order_id = order['orderId']
+        tracking_number = shipworks_tracking.get(order_id)
+        if tracking_number:
+            mismatched_orders.append({'Walmart Order ID': order_id, 'Tracking Number': tracking_number})
+    return mismatched_orders
+
+mismatched_orders_list = generate_mismatch_list()
+print(mismatched_orders_list)
